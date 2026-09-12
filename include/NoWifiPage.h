@@ -1,13 +1,13 @@
 #pragma once
 
-#include <WiFiManager.h>
+#include <EasyESPConnect.h>
 
 #include "Display.h"
 #include "Page.h"
 
 class NoWifiPage : public Page {
  public:
-  NoWifiPage(Display &display, WiFiManager &wifiManager);
+  NoWifiPage(Display &display, EasyESPConnect &wifiManager);
 
   void setup() override;
   void loop() override;
@@ -15,8 +15,8 @@ class NoWifiPage : public Page {
 
  private:
   Display &display_;
-  WiFiManager &wifiManager_;
+  EasyESPConnect &wifiManager_;
 
   void showScreen();
-  void connectInteractive();
+  void startPortal();
 };

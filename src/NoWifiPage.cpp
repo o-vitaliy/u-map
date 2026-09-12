@@ -1,6 +1,8 @@
 #include "NoWifiPage.h"
 
-NoWifiPage::NoWifiPage(Display &display, WiFiManager &wifiManager)
+#include "Consts.h"
+
+NoWifiPage::NoWifiPage(Display &display, EasyESPConnect &wifiManager)
     : display_(display), wifiManager_(wifiManager) {}
 
 void NoWifiPage::setup() { showScreen(); }
@@ -9,7 +11,10 @@ void NoWifiPage::loop() {}
 
 void NoWifiPage::buttonClick(UiAction action) {
   if (action == UiAction::RIGHT) {
-    connectInteractive();
+    startPortal();
+  } else if (action == UiAction::CANCEL) {
+    // Erases saved credentials and restarts the device.
+    wifiManager_.resetSettings();
   }
 }
 
@@ -17,15 +22,13 @@ void NoWifiPage::showScreen() {
   display_.showMessage("no connection\nClick > to setup\nwifi");
 }
 
-// Explicitly opens the WiFiManager config portal (blocking) so the user
-// can pick a network. Only called in response to a button press, never
-// automatically.
-void NoWifiPage::connectInteractive() {
-  display_.showMessage("Connecting...\nOpen u-lamp-setup\nWiFi to configure");
-  wifiManager_.setEnableConfigPortal(true);
-  if (wifiManager_.startConfigPortal("u-lamp-setup")) {
-    changeState(AppState::CLOCK);
-  } else {
-    showScreen();
-  }
+// startWebPortal() only sets up the AP + captive portal and returns
+// immediately (non-blocking) -- the device restarts itself once the user
+// submits credentials through the portal, so there's nothing to wait for
+// or report back here.
+void NoWifiPage::startPortal() {
+  display_.showMessage(String("Connecting...\nOpen ") + Consts::AP_SSID +
+                        "\nWiFi to configure");
+ Serial.println("startWebPortal");
+  wifiManager_.startWebPortal(Consts::AP_SSID);
 }

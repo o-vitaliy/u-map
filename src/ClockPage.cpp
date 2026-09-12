@@ -4,21 +4,106 @@
 
 namespace {
 const unsigned long CLOCK_UPDATE_INTERVAL_MS = 1000;
+const uint32_t CONNECT_TASK_STACK_BYTES = 8192;
+const uint32_t TIME_SYNC_TASK_STACK_BYTES = 4096;
+const uint32_t TIME_SYNC_RETRY_MS = 5000;
 }  // namespace
 
-ClockPage::ClockPage(Display &display, const char *timezoneInfo)
-    : display_(display), timezoneInfo_(timezoneInfo), lastUpdateMs_(0) {}
+ClockPage::ClockPage(Display &display, EasyESPConnect &wifiManager, const char *timezoneInfo)
+    : display_(display),
+      wifiManager_(wifiManager),
+      timezoneInfo_(timezoneInfo),
+      lastUpdateMs_(0),
+      timeSyncStarted_(false),
+      connectStatus_(ConnectStatus::CONNECTING),
+      timeStatus_(TimeStatus::SYNCING) {}
 
 void ClockPage::setup() {
-  configTzTime(timezoneInfo_, "pool.ntp.org", "time.nist.gov");
-  lastUpdateMs_ = 0;
-  updateClockDisplay();
+  connectStatus_ = ConnectStatus::CONNECTING;
+  timeStatus_ = TimeStatus::SYNCING;
+  timeSyncStarted_ = false;
+  display_.showMessage("Connecting...");
+  startConnectTask();
+}
+
+void ClockPage::startConnectTask() {
+  BaseType_t created = xTaskCreate(connectTaskEntry, "wifi-connect",
+                                    CONNECT_TASK_STACK_BYTES, this, 1, nullptr);
+  if (created != pdPASS) {
+    Serial.println("ClockPage: failed to create wifi connect task");
+    connectStatus_ = ConnectStatus::FAILED;
+  }
+}
+
+// Runs on a dedicated FreeRTOS task so the blocking tryToConnect() call
+// doesn't stall the main loop (buttons, display). Only touches WiFi and
+// the atomic status flag -- never the Display, which is not safe to
+// drive from two tasks at once.
+void ClockPage::connectTaskEntry(void *param) {
+  ClockPage *self = static_cast<ClockPage *>(param);
+
+  // tryToConnect() never opens the AP/portal itself -- on failure this
+  // just falls back to the "no connection" state, and NoWifiPage's RIGHT
+  // button explicitly opens the portal from there.
+  bool connected = self->wifiManager_.tryToConnect();
+  self->connectStatus_ =
+      connected ? ConnectStatus::CONNECTED : ConnectStatus::FAILED;
+
+  vTaskDelete(nullptr);
+}
+
+void ClockPage::startTimeSyncTask() {
+  BaseType_t created = xTaskCreate(timeSyncTaskEntry, "time-sync",
+                                    TIME_SYNC_TASK_STACK_BYTES, this, 1, nullptr);
+  if (created != pdPASS) {
+    Serial.println("ClockPage: failed to create time sync task");
+  }
+}
+
+// Runs on a dedicated FreeRTOS task: configures NTP and blocks (via
+// getLocalTime()'s own timeout, retried) until the clock is valid. Only
+// touches time-related state and the atomic status flag -- never the
+// Display.
+void ClockPage::timeSyncTaskEntry(void *param) {
+  ClockPage *self = static_cast<ClockPage *>(param);
+
+  configTzTime(self->timezoneInfo_, "pool.ntp.org", "time.nist.gov");
+
+  struct tm timeInfo;
+  while (!getLocalTime(&timeInfo, TIME_SYNC_RETRY_MS)) {
+    // Keep retrying until NTP sync succeeds.
+  }
+  self->timeStatus_ = TimeStatus::SYNCED;
+
+  vTaskDelete(nullptr);
 }
 
 void ClockPage::loop() {
+  ConnectStatus connectStatus = connectStatus_;
+
+  if (connectStatus == ConnectStatus::CONNECTING) {
+    return;
+  }
+
+  if (connectStatus == ConnectStatus::FAILED) {
+    changeState(AppState::NO_WIFI);
+    return;
+  }
+
+  if (!timeSyncStarted_) {
+    timeSyncStarted_ = true;
+    startTimeSyncTask();
+  }
+
   unsigned long now = millis();
-  if (now - lastUpdateMs_ >= CLOCK_UPDATE_INTERVAL_MS) {
-    lastUpdateMs_ = now;
+  if (now - lastUpdateMs_ < CLOCK_UPDATE_INTERVAL_MS) {
+    return;
+  }
+  lastUpdateMs_ = now;
+
+  if (timeStatus_ == TimeStatus::SYNCING) {
+    display_.showMessage("Time sync...");
+  } else {
     updateClockDisplay();
   }
 }
@@ -29,12 +114,6 @@ void ClockPage::buttonClick(UiAction action) {
 
 void ClockPage::updateClockDisplay() {
   time_t now = time(nullptr);
-  if (now < 1700000000) {
-    // Not synced via NTP yet.
-    display_.showMessage("Time sync...");
-    return;
-  }
-
   struct tm timeInfo;
   localtime_r(&now, &timeInfo);
   char buf[6];

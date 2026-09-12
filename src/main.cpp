@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <EasyESPConnect.h>
+#include <FastLED.h>
 
 #include "AerialAlertsClient.h"
 #include "AppTypes.h"
@@ -20,6 +21,11 @@
 #define OLED_I2C_ADDRESS 0x3C
 #define NO_GLOBAL_SERIAL true
 #define NO_GLOBAL_INSTANCES true
+
+#define LED_PIN 0
+#define LED_COUNT 2
+
+CRGB leds[LED_COUNT];
 
 // Europe/Kyiv.
 const char *TIMEZONE_INFO = "EET-2EEST,M3.5.0/3,M10.5.0/4";
@@ -49,6 +55,12 @@ void setup()
   delay(100);
 
   Serial.println("Initial setup");
+
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
+    fill_solid(leds, LED_COUNT, CRGB::Green);
+  
+
+  FastLED.show();
 
   display = new Display(OLED_SDA_PIN, OLED_SCL_PIN, OLED_WIDTH, OLED_HEIGHT,
                         OLED_I2C_ADDRESS);

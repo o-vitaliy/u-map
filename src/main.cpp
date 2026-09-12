@@ -50,15 +50,20 @@ void switchToPage(AppState state)
 void setup()
 {
   Serial.begin(115200);
+
+   delay(1000);
+
+  // fix wifi
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
+  
   esp_bt_controller_disable();
 
-  delay(100);
+ 
 
   Serial.println("Initial setup");
 
   FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
-    fill_solid(leds, LED_COUNT, CRGB::Green);
-  
+  fill_solid(leds, LED_COUNT, CRGB::Green);
 
   FastLED.show();
 

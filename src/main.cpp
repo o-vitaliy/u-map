@@ -5,7 +5,7 @@
 #include "AerialAlertsClient.h"
 #include "AppTypes.h"
 #include "Button.h"
-#include "ClockPage.h"
+#include "MainPage.h"
 #include "Display.h"
 #include "NoWifiPage.h"
 #include "Page.h"
@@ -36,13 +36,13 @@ Button *button1;
 Button *button2;
 Display *display;
 NoWifiPage *noWifiPage;
-ClockPage *clockPage;
+MainPage *mainPage;
 
 Page *currentPage;
 
 void switchToPage(AppState state)
 {
-  currentPage = (state == AppState::CLOCK) ? static_cast<Page *>(clockPage)
+  currentPage = (state == AppState::CLOCK) ? static_cast<Page *>(mainPage)
                                            : static_cast<Page *>(noWifiPage);
   currentPage->setup();
 }
@@ -84,7 +84,7 @@ void setup()
   button2 = new Button(BUTTON2_PIN);
 
   noWifiPage = new NoWifiPage(*display, *wifiManager);
-  clockPage = new ClockPage(*display, *wifiManager, TIMEZONE_INFO);
+  mainPage = new MainPage(*display, *wifiManager, TIMEZONE_INFO);
   // alertsClient = new AerialAlertsClient("https://ubilling.net.ua/aerialalerts/", 15000);
 
   button1->begin();
@@ -100,11 +100,11 @@ void setup()
                        { currentPage->buttonClick(UiAction::CANCEL); });
 
   noWifiPage->stateChangeCallback(switchToPage);
-  clockPage->stateChangeCallback(switchToPage);
+  mainPage->stateChangeCallback(switchToPage);
 
   // getWiFiIsSaved() only reads stored credentials from NVS, so it's an
   // instant way to rule out the "definitely no wifi" case before paying
-  // for an actual (slower) connection attempt in ClockPage::setup().
+  // for an actual (slower) connection attempt in MainPage::setup().
   AppState initialState =
       wifiManager->getWiFiIsSaved() ? AppState::CLOCK : AppState::NO_WIFI;
   switchToPage(initialState);

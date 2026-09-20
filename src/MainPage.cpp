@@ -1,4 +1,4 @@
-#include "ClockPage.h"
+#include "MainPage.h"
 
 #include <time.h>
 
@@ -9,7 +9,7 @@ const uint32_t TIME_SYNC_TASK_STACK_BYTES = 4096;
 const uint32_t TIME_SYNC_RETRY_MS = 5000;
 }  // namespace
 
-ClockPage::ClockPage(Display &display, EasyESPConnect &wifiManager, const char *timezoneInfo)
+MainPage::MainPage(Display &display, EasyESPConnect &wifiManager, const char *timezoneInfo)
     : display_(display),
       wifiManager_(wifiManager),
       timezoneInfo_(timezoneInfo),
@@ -18,7 +18,7 @@ ClockPage::ClockPage(Display &display, EasyESPConnect &wifiManager, const char *
       connectStatus_(ConnectStatus::CONNECTING),
       timeStatus_(TimeStatus::SYNCING) {}
 
-void ClockPage::setup() {
+void MainPage::setup() {
   connectStatus_ = ConnectStatus::CONNECTING;
   timeStatus_ = TimeStatus::SYNCING;
   timeSyncStarted_ = false;
@@ -26,11 +26,11 @@ void ClockPage::setup() {
   startConnectTask();
 }
 
-void ClockPage::startConnectTask() {
+void MainPage::startConnectTask() {
   BaseType_t created = xTaskCreate(connectTaskEntry, "wifi-connect",
                                     CONNECT_TASK_STACK_BYTES, this, 1, nullptr);
   if (created != pdPASS) {
-    Serial.println("ClockPage: failed to create wifi connect task");
+    Serial.println("MainPage: failed to create wifi connect task");
     connectStatus_ = ConnectStatus::FAILED;
   }
 }
@@ -39,8 +39,8 @@ void ClockPage::startConnectTask() {
 // doesn't stall the main loop (buttons, display). Only touches WiFi and
 // the atomic status flag -- never the Display, which is not safe to
 // drive from two tasks at once.
-void ClockPage::connectTaskEntry(void *param) {
-  ClockPage *self = static_cast<ClockPage *>(param);
+void MainPage::connectTaskEntry(void *param) {
+  MainPage *self = static_cast<MainPage *>(param);
 
   // tryToConnect() never opens the AP/portal itself -- on failure this
   // just falls back to the "no connection" state, and NoWifiPage's RIGHT
@@ -52,11 +52,11 @@ void ClockPage::connectTaskEntry(void *param) {
   vTaskDelete(nullptr);
 }
 
-void ClockPage::startTimeSyncTask() {
+void MainPage::startTimeSyncTask() {
   BaseType_t created = xTaskCreate(timeSyncTaskEntry, "time-sync",
                                     TIME_SYNC_TASK_STACK_BYTES, this, 1, nullptr);
   if (created != pdPASS) {
-    Serial.println("ClockPage: failed to create time sync task");
+    Serial.println("MainPage: failed to create time sync task");
   }
 }
 
@@ -64,8 +64,8 @@ void ClockPage::startTimeSyncTask() {
 // getLocalTime()'s own timeout, retried) until the clock is valid. Only
 // touches time-related state and the atomic status flag -- never the
 // Display.
-void ClockPage::timeSyncTaskEntry(void *param) {
-  ClockPage *self = static_cast<ClockPage *>(param);
+void MainPage::timeSyncTaskEntry(void *param) {
+  MainPage *self = static_cast<MainPage *>(param);
 
   configTzTime(self->timezoneInfo_, "pool.ntp.org", "time.nist.gov");
 
@@ -78,7 +78,7 @@ void ClockPage::timeSyncTaskEntry(void *param) {
   vTaskDelete(nullptr);
 }
 
-void ClockPage::loop() {
+void MainPage::loop() {
   ConnectStatus connectStatus = connectStatus_;
 
   if (connectStatus == ConnectStatus::CONNECTING) {
@@ -108,11 +108,11 @@ void ClockPage::loop() {
   }
 }
 
-void ClockPage::buttonClick(UiAction action) {
+void MainPage::buttonClick(UiAction action) {
   // Settings menu not implemented yet.
 }
 
-void ClockPage::updateClockDisplay() {
+void MainPage::updateClockDisplay() {
   time_t now = time(nullptr);
   struct tm timeInfo;
   localtime_r(&now, &timeInfo);

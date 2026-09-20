@@ -6,9 +6,9 @@
 #include "Display.h"
 #include "Page.h"
 
-class ClockPage : public Page {
+class MainPage : public Page {
  public:
-  ClockPage(Display &display, EasyESPConnect &wifiManager, const char *timezoneInfo);
+  MainPage(Display &display, EasyESPConnect &wifiManager, const char *timezoneInfo);
 
   void setup() override;
   void loop() override;

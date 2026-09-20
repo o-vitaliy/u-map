@@ -1,27 +1,22 @@
 #include "MainPage.h"
 
-#include <time.h>
-
 namespace {
-const unsigned long CLOCK_UPDATE_INTERVAL_MS = 1000;
 const uint32_t CONNECT_TASK_STACK_BYTES = 8192;
-const uint32_t TIME_SYNC_TASK_STACK_BYTES = 4096;
-const uint32_t TIME_SYNC_RETRY_MS = 5000;
 }  // namespace
 
-MainPage::MainPage(Display &display, EasyESPConnect &wifiManager, const char *timezoneInfo)
+MainPage::MainPage(Display &display, EasyESPConnect &wifiManager,
+                   ClockComponent &clockComponent,
+                   AlertComponent &alertComponent)
     : display_(display),
       wifiManager_(wifiManager),
-      timezoneInfo_(timezoneInfo),
-      lastUpdateMs_(0),
-      timeSyncStarted_(false),
+      clockComponent_(clockComponent),
+      alertComponent_(alertComponent),
       connectStatus_(ConnectStatus::CONNECTING),
-      timeStatus_(TimeStatus::SYNCING) {}
+      componentsStarted_(false) {}
 
 void MainPage::setup() {
   connectStatus_ = ConnectStatus::CONNECTING;
-  timeStatus_ = TimeStatus::SYNCING;
-  timeSyncStarted_ = false;
+  componentsStarted_ = false;
   display_.showMessage("Connecting...");
   startConnectTask();
 }
@@ -52,32 +47,6 @@ void MainPage::connectTaskEntry(void *param) {
   vTaskDelete(nullptr);
 }
 
-void MainPage::startTimeSyncTask() {
-  BaseType_t created = xTaskCreate(timeSyncTaskEntry, "time-sync",
-                                    TIME_SYNC_TASK_STACK_BYTES, this, 1, nullptr);
-  if (created != pdPASS) {
-    Serial.println("MainPage: failed to create time sync task");
-  }
-}
-
-// Runs on a dedicated FreeRTOS task: configures NTP and blocks (via
-// getLocalTime()'s own timeout, retried) until the clock is valid. Only
-// touches time-related state and the atomic status flag -- never the
-// Display.
-void MainPage::timeSyncTaskEntry(void *param) {
-  MainPage *self = static_cast<MainPage *>(param);
-
-  configTzTime(self->timezoneInfo_, "pool.ntp.org", "time.nist.gov");
-
-  struct tm timeInfo;
-  while (!getLocalTime(&timeInfo, TIME_SYNC_RETRY_MS)) {
-    // Keep retrying until NTP sync succeeds.
-  }
-  self->timeStatus_ = TimeStatus::SYNCED;
-
-  vTaskDelete(nullptr);
-}
-
 void MainPage::loop() {
   ConnectStatus connectStatus = connectStatus_;
 
@@ -90,33 +59,16 @@ void MainPage::loop() {
     return;
   }
 
-  if (!timeSyncStarted_) {
-    timeSyncStarted_ = true;
-    startTimeSyncTask();
+  if (!componentsStarted_) {
+    componentsStarted_ = true;
+    clockComponent_.setup();
+    alertComponent_.setup();
   }
 
-  unsigned long now = millis();
-  if (now - lastUpdateMs_ < CLOCK_UPDATE_INTERVAL_MS) {
-    return;
-  }
-  lastUpdateMs_ = now;
-
-  if (timeStatus_ == TimeStatus::SYNCING) {
-    display_.showMessage("Time sync...");
-  } else {
-    updateClockDisplay();
-  }
+  clockComponent_.loop();
+  alertComponent_.loop();
 }
 
 void MainPage::buttonClick(UiAction action) {
   // Settings menu not implemented yet.
-}
-
-void MainPage::updateClockDisplay() {
-  time_t now = time(nullptr);
-  struct tm timeInfo;
-  localtime_r(&now, &timeInfo);
-  char buf[6];
-  strftime(buf, sizeof(buf), "%H:%M", &timeInfo);
-  display_.showClock(buf);
 }

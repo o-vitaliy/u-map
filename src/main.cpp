@@ -2,13 +2,15 @@
 #include <EasyESPConnect.h>
 #include <FastLED.h>
 
-#include "AerialAlertsClient.h"
+#include "AlertComponent.h"
 #include "AppTypes.h"
 #include "Button.h"
+#include "ClockComponent.h"
 #include "MainPage.h"
 #include "Display.h"
 #include "NoWifiPage.h"
 #include "Page.h"
+#include "Regions.h"
 #include <Consts.h>
 #include <esp_bt.h>
 
@@ -23,20 +25,21 @@
 #define NO_GLOBAL_INSTANCES true
 
 #define LED_PIN 0
-#define LED_COUNT 2
+constexpr size_t LED_COUNT = Regions::INDEX_COUNT;
 
 CRGB leds[LED_COUNT];
 
 // Europe/Kyiv.
 const char *TIMEZONE_INFO = "EET-2EEST,M3.5.0/3,M10.5.0/4";
 
-// AerialAlertsClient *alertsClient;
 EasyESPConnect *wifiManager;
 Button *button1;
 Button *button2;
 Display *display;
 NoWifiPage *noWifiPage;
 MainPage *mainPage;
+ClockComponent *clockComponent;
+AlertComponent *alertComponent;
 
 Page *currentPage;
 
@@ -79,13 +82,15 @@ void setup()
   display->showMessage("Starting");
 
   wifiManager = new EasyESPConnect();
+  clockComponent = new ClockComponent(*display, TIMEZONE_INFO);
+  alertComponent = new AlertComponent("https://ubilling.net.ua/aerialalerts/", 15000,
+                                      leds, LED_COUNT);
 
   button1 = new Button(BUTTON1_PIN);
   button2 = new Button(BUTTON2_PIN);
 
   noWifiPage = new NoWifiPage(*display, *wifiManager);
-  mainPage = new MainPage(*display, *wifiManager, TIMEZONE_INFO);
-  // alertsClient = new AerialAlertsClient("https://ubilling.net.ua/aerialalerts/", 15000);
+  mainPage = new MainPage(*display, *wifiManager, *clockComponent, *alertComponent);
 
   button1->begin();
   button1->onClick([]()
@@ -114,8 +119,6 @@ void loop()
 {
   button1->loop();
   button2->loop();
-  // alertsClient->loop();
-
   // Services the captive portal (once NoWifiPage has opened it) and the
   // library's own hardware factory-reset pin. Safe to call unconditionally.
   wifiManager->loop();

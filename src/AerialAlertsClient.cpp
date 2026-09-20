@@ -37,8 +37,8 @@ void AerialAlertsClient::poll() {
 }
 
 void AerialAlertsClient::parseResponse(const String &payload) {
-  // 25 regions * ~65 bytes/entry (JsonObject overhead + key/value) fits well
-  // under this with room to spare.
+  // The configured regions * ~65 bytes/entry (JsonObject overhead + key/value)
+  // fits well under this with room to spare.
   JsonDocument doc;
   DeserializationError err = deserializeJson(doc, payload);
   if (err) {

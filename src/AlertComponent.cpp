@@ -12,6 +12,7 @@ void AlertComponent::setup() {
 
 void AlertComponent::loop() {
   alertsClient_.loop();
+  alertsClient_.copyRegionsTo(regions_);
   updateRegionLeds();
 }
 
@@ -23,7 +24,7 @@ void AlertComponent::updateRegionLeds() {
     }
   }
 
-  for (const RegionAlert &region : alertsClient_.regions()) {
+  for (const RegionAlert &region : regions_) {
     int index = Regions::indexForName(region.name.c_str());
     if (index < 0 || static_cast<size_t>(index) >= ledCount_) {
       continue;

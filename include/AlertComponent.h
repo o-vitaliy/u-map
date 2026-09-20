@@ -1,6 +1,7 @@
 #pragma once
 
 #include <FastLED.h>
+#include <vector>
 
 #include "AerialAlertsClient.h"
 #include "Component.h"
@@ -15,6 +16,7 @@ class AlertComponent : public Component {
 
  private:
   AerialAlertsClient alertsClient_;
+  std::vector<RegionAlert> regions_;
   CRGB *leds_;
   size_t ledCount_;
 

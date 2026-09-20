@@ -6,13 +6,36 @@
 #include <HTTPClient.h>
 
 AerialAlertsClient::AerialAlertsClient(const char *url, unsigned long pollIntervalMs)
-    : url_(url), pollIntervalMs_(pollIntervalMs), lastPollMs_(0) {}
+    : url_(url),
+      pollIntervalMs_(pollIntervalMs),
+      regionsMutex_(xSemaphoreCreateMutex()),
+      pollingTask_(nullptr) {}
 
 void AerialAlertsClient::loop() {
-  unsigned long now = millis();
-  if (WiFi.status() == WL_CONNECTED && now - lastPollMs_ >= pollIntervalMs_) {
-    lastPollMs_ = now;
-    poll();
+  if (pollingTask_ == nullptr) {
+    startPollingTask();
+  }
+}
+
+void AerialAlertsClient::startPollingTask() {
+  BaseType_t created = xTaskCreate(pollingTaskEntry, "alerts-poll", 8192, this,
+                                  1, &pollingTask_);
+  if (created != pdPASS) {
+    pollingTask_ = nullptr;
+    Serial.println("Aerial alerts: failed to create polling task");
+  }
+}
+
+void AerialAlertsClient::pollingTaskEntry(void *param) {
+  AerialAlertsClient *self = static_cast<AerialAlertsClient *>(param);
+
+  while (true) {
+    if (WiFi.status() == WL_CONNECTED) {
+      self->poll();
+      vTaskDelay(pdMS_TO_TICKS(self->pollIntervalMs_));
+    } else {
+      vTaskDelay(pdMS_TO_TICKS(250));
+    }
   }
 }
 
@@ -52,23 +75,39 @@ void AerialAlertsClient::parseResponse(const String &payload) {
     return;
   }
 
-  regions_.clear();
-  regions_.reserve(states.size());
+  std::vector<RegionAlert> updatedRegions;
+  updatedRegions.reserve(states.size());
   for (JsonPair kv : states) {
     RegionAlert region;
     region.name = kv.key().c_str();
     region.alertNow = kv.value()["alertnow"] | false;
-    regions_.push_back(region);
+    updatedRegions.push_back(region);
   }
 
-  Serial.printf("Aerial alerts: parsed %u regions\n", regions_.size());
-  for (const RegionAlert &region : regions_) {
+  const size_t regionCount = updatedRegions.size();
+  Serial.printf("Aerial alerts: parsed %u regions\n", regionCount);
+  for (const RegionAlert &region : updatedRegions) {
     Serial.printf("  %s: %s\n", region.name.c_str(), region.alertNow ? "ALERT" : "clear");
+  }
+
+  if (xSemaphoreTake(regionsMutex_, portMAX_DELAY) == pdTRUE) {
+    regions_.swap(updatedRegions);
+    xSemaphoreGive(regionsMutex_);
+  }
+}
+
+void AerialAlertsClient::copyRegionsTo(
+  std::vector<RegionAlert> &destination) const {
+  if (xSemaphoreTake(regionsMutex_, portMAX_DELAY) == pdTRUE) {
+    destination = regions_;
+    xSemaphoreGive(regionsMutex_);
   }
 }
 
 bool AerialAlertsClient::anyAlertActive() const {
-  for (const RegionAlert &region : regions_) {
+  std::vector<RegionAlert> snapshot;
+  copyRegionsTo(snapshot);
+  for (const RegionAlert &region : snapshot) {
     if (region.alertNow) {
       return true;
     }

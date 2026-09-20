@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <vector>
 
 struct RegionAlert {
@@ -12,15 +14,14 @@ class AerialAlertsClient {
  public:
   AerialAlertsClient(const char *url, unsigned long pollIntervalMs);
 
-  // Call from the main loop(). Polls the endpoint at most once per
-  // pollIntervalMs, and only while WiFi is connected.
+  // Starts the background polling task. Returns immediately.
   void loop();
 
   // Fires a request immediately, regardless of the poll interval.
   void poll();
 
-  // Per-region alert state from the last successful poll.
-  const std::vector<RegionAlert> &regions() const { return regions_; }
+  // Copies the per-region alert state from the last successful poll.
+  void copyRegionsTo(std::vector<RegionAlert> &destination) const;
 
   // True if any region in the last successful poll has alertnow=true.
   bool anyAlertActive() const;
@@ -28,8 +29,11 @@ class AerialAlertsClient {
  private:
   const char *url_;
   unsigned long pollIntervalMs_;
-  unsigned long lastPollMs_;
   std::vector<RegionAlert> regions_;
+  SemaphoreHandle_t regionsMutex_;
+  TaskHandle_t pollingTask_;
 
+  void startPollingTask();
+  static void pollingTaskEntry(void *param);
   void parseResponse(const String &payload);
 };

@@ -1,18 +1,22 @@
 #include <Arduino.h>
-#include <EasyESPConnect.h>
-#include <FastLED.h>
+#include <Adafruit_NeoPixel.h>
 
-#include "AlertComponent.h"
-#include "AppTypes.h"
 #include "Button.h"
-#include "ClockComponent.h"
-#include "MainPage.h"
 #include "Display.h"
-#include "NoWifiPage.h"
 #include "Page.h"
 #include "Regions.h"
+#if defined(LED_DEBUG_PAGE)
+#include "LEDDebugPage.h"
+#else
+#include <EasyESPConnect.h>
+
+#include "AlertComponent.h"
+#include "ClockComponent.h"
+#include "MainPage.h"
+#include "NoWifiPage.h"
 #include <Consts.h>
 #include <esp_bt.h>
+#endif
 
 #define BUTTON1_PIN 5
 #define BUTTON2_PIN 6
@@ -25,50 +29,56 @@
 #define NO_GLOBAL_INSTANCES true
 
 #define LED_PIN 0
+#if defined(LED_DEBUG_PAGE)
+constexpr size_t LED_COUNT = 1;
+#else
 constexpr size_t LED_COUNT = Regions::INDEX_COUNT;
+#endif
 
-CRGB leds[LED_COUNT];
+Adafruit_NeoPixel leds(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // Europe/Kyiv.
 const char *TIMEZONE_INFO = "EET-2EEST,M3.5.0/3,M10.5.0/4";
 
-EasyESPConnect *wifiManager;
 Button *button1;
 Button *button2;
 Display *display;
+#if defined(LED_DEBUG_PAGE)
+LEDDebugPage *debugPage;
+#else
+EasyESPConnect *wifiManager;
 NoWifiPage *noWifiPage;
 MainPage *mainPage;
 ClockComponent *clockComponent;
 AlertComponent *alertComponent;
+#endif
 
 Page *currentPage;
 
+#if !defined(LED_DEBUG_PAGE)
 void switchToPage(AppState state)
 {
   currentPage = (state == AppState::CLOCK) ? static_cast<Page *>(mainPage)
                                            : static_cast<Page *>(noWifiPage);
   currentPage->setup();
 }
+#endif
 
 void setup()
 {
   Serial.begin(115200);
 
+  pinMode(0, OUTPUT);
+
    delay(1000);
 
-  // fix wifi
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
-  
+#if !defined(LED_DEBUG_PAGE)
   esp_bt_controller_disable();
-
- 
+  WiFi.mode(WIFI_STA);
+  WiFi.setTxPower(WIFI_POWER_11dBm);
+#endif
 
   Serial.println("Initial setup");
-
-  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
-  fill_solid(leds, LED_COUNT, CRGB::Green);
-
-  FastLED.show();
 
   display = new Display(OLED_SDA_PIN, OLED_SCL_PIN, OLED_WIDTH, OLED_HEIGHT,
                         OLED_I2C_ADDRESS);
@@ -81,16 +91,20 @@ void setup()
 
   display->showMessage("Starting");
 
-  wifiManager = new EasyESPConnect();
-  clockComponent = new ClockComponent(*display, TIMEZONE_INFO);
-  alertComponent = new AlertComponent("https://ubilling.net.ua/aerialalerts/", 15000,
-                                      leds, LED_COUNT);
-
   button1 = new Button(BUTTON1_PIN);
   button2 = new Button(BUTTON2_PIN);
 
+#if defined(LED_DEBUG_PAGE)
+  debugPage = new LEDDebugPage(*display, leds);
+  currentPage = debugPage;
+#else
+  wifiManager = new EasyESPConnect();
+  clockComponent = new ClockComponent(*display, TIMEZONE_INFO);
+  alertComponent = new AlertComponent("https://ubilling.net.ua/aerialalerts/", 15000,
+                                      leds);
   noWifiPage = new NoWifiPage(*display, *wifiManager);
   mainPage = new MainPage(*display, *wifiManager, *clockComponent, *alertComponent);
+#endif
 
   button1->begin();
   button1->onClick([]()
@@ -104,24 +118,27 @@ void setup()
   button2->onLongPress([]()
                        { currentPage->buttonClick(UiAction::CANCEL); });
 
+#if defined(LED_DEBUG_PAGE)
+  currentPage->setup();
+#else
   noWifiPage->stateChangeCallback(switchToPage);
   mainPage->stateChangeCallback(switchToPage);
-
   // getWiFiIsSaved() only reads stored credentials from NVS, so it's an
   // instant way to rule out the "definitely no wifi" case before paying
   // for an actual (slower) connection attempt in MainPage::setup().
   AppState initialState =
       wifiManager->getWiFiIsSaved() ? AppState::CLOCK : AppState::NO_WIFI;
   switchToPage(initialState);
+#endif
 }
 
 void loop()
 {
   button1->loop();
   button2->loop();
-  // Services the captive portal (once NoWifiPage has opened it) and the
-  // library's own hardware factory-reset pin. Safe to call unconditionally.
+#if !defined(LED_DEBUG_PAGE)
   wifiManager->loop();
+#endif
 
   currentPage->loop();
 }

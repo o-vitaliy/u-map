@@ -75,19 +75,15 @@ void AerialAlertsClient::parseResponse(const String &payload) {
     return;
   }
 
-  std::vector<RegionAlert> updatedRegions;
-  updatedRegions.reserve(states.size());
+  std::map<String, bool> updatedRegions;
   for (JsonPair kv : states) {
-    RegionAlert region;
-    region.name = kv.key().c_str();
-    region.alertNow = kv.value()["alertnow"] | false;
-    updatedRegions.push_back(region);
+    updatedRegions[kv.key().c_str()] = kv.value()["alertnow"] | false;
   }
 
   const size_t regionCount = updatedRegions.size();
   Serial.printf("Aerial alerts: parsed %u regions\n", regionCount);
-  for (const RegionAlert &region : updatedRegions) {
-    Serial.printf("  %s: %s\n", region.name.c_str(), region.alertNow ? "ALERT" : "clear");
+  for (const auto &region : updatedRegions) {
+    Serial.printf("  %s: %s\n", region.first.c_str(), region.second ? "ALERT" : "clear");
   }
 
   if (xSemaphoreTake(regionsMutex_, portMAX_DELAY) == pdTRUE) {
@@ -97,7 +93,7 @@ void AerialAlertsClient::parseResponse(const String &payload) {
 }
 
 void AerialAlertsClient::copyRegionsTo(
-  std::vector<RegionAlert> &destination) const {
+  std::map<String, bool> &destination) const {
   if (xSemaphoreTake(regionsMutex_, portMAX_DELAY) == pdTRUE) {
     destination = regions_;
     xSemaphoreGive(regionsMutex_);
@@ -105,10 +101,10 @@ void AerialAlertsClient::copyRegionsTo(
 }
 
 bool AerialAlertsClient::anyAlertActive() const {
-  std::vector<RegionAlert> snapshot;
+  std::map<String, bool> snapshot;
   copyRegionsTo(snapshot);
-  for (const RegionAlert &region : snapshot) {
-    if (region.alertNow) {
+  for (const auto &region : snapshot) {
+    if (region.second) {
       return true;
     }
   }

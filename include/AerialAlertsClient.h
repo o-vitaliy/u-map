@@ -3,12 +3,7 @@
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
-#include <vector>
-
-struct RegionAlert {
-  String name;
-  bool alertNow;
-};
+#include <map>
 
 class AerialAlertsClient {
  public:
@@ -21,7 +16,7 @@ class AerialAlertsClient {
   void poll();
 
   // Copies the per-region alert state from the last successful poll.
-  void copyRegionsTo(std::vector<RegionAlert> &destination) const;
+  void copyRegionsTo(std::map<String, bool> &destination) const;
 
   // True if any region in the last successful poll has alertnow=true.
   bool anyAlertActive() const;
@@ -29,7 +24,7 @@ class AerialAlertsClient {
  private:
   const char *url_;
   unsigned long pollIntervalMs_;
-  std::vector<RegionAlert> regions_;
+  std::map<String, bool> regions_;
   SemaphoreHandle_t regionsMutex_;
   TaskHandle_t pollingTask_;
 

@@ -1,24 +1,23 @@
 #pragma once
 
-#include <FastLED.h>
-#include <vector>
+#include <Adafruit_NeoPixel.h>
+#include <map>
 
 #include "AerialAlertsClient.h"
 #include "Component.h"
 
 class AlertComponent : public Component {
  public:
-  AlertComponent(const char *url, unsigned long pollIntervalMs, CRGB *leds,
-                 size_t ledCount);
+  AlertComponent(const char *url, unsigned long pollIntervalMs,
+                 Adafruit_NeoPixel &leds);
 
   void setup() override;
   void loop() override;
 
  private:
   AerialAlertsClient alertsClient_;
-  std::vector<RegionAlert> regions_;
-  CRGB *leds_;
-  size_t ledCount_;
+  std::map<String, bool> regions_;
+  Adafruit_NeoPixel &leds_;
 
   void updateRegionLeds();
 };

@@ -5,8 +5,7 @@ constexpr uint8_t LED_DATA_PIN = 0;
 }
 
 LEDDebugPage::LEDDebugPage(Display &display, Adafruit_NeoPixel &leds)
-    : display_(display), leds_(leds),
-      selectedColor_(Color::RED) {}
+  : display_(display), leds_(leds), selectedColor_(Color::RED) {}
 
 void LEDDebugPage::setup() {
   leds_.begin();
@@ -26,7 +25,6 @@ void LEDDebugPage::buttonClick(UiAction action) {
 }
 
 void LEDDebugPage::showSelectedColor() {
-  uint32_t color;
   uint8_t red = 0;
   uint8_t green = 0;
   uint8_t blue = 0;
@@ -51,12 +49,12 @@ void LEDDebugPage::showSelectedColor() {
       break;
   }
 
-  color = leds_.Color(red, green, blue);
+  uint32_t color = leds_.Color(red, green, blue);
   for (uint16_t index = 0; index < leds_.numPixels(); ++index) {
     leds_.setPixelColor(index, color);
   }
-  Serial.printf("LED debug: pin=%u count=%u RGB=(%u,%u,%u)\n",
-                LED_DATA_PIN, leds_.numPixels(), red, green, blue);
+  Serial.printf("LED debug: color=%s pin=%u count=%u RGB=(%u,%u,%u)\n",
+                name, LED_DATA_PIN, leds_.numPixels(), red, green, blue);
   leds_.show();
   display_.showMessage(name);
 }

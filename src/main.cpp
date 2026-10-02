@@ -5,7 +5,9 @@
 #include "Display.h"
 #include "Page.h"
 #include "Regions.h"
-#if defined(LED_DEBUG_PAGE)
+#if defined(LED_REGION_DEBUG_PAGE)
+#include "RegionDebugPage.h"
+#elif defined(LED_DEBUG_PAGE)
 #include "LEDDebugPage.h"
 #else
 #include <EasyESPConnect.h>
@@ -29,8 +31,8 @@
 #define NO_GLOBAL_INSTANCES true
 
 #define LED_PIN 0
-#if defined(LED_DEBUG_PAGE)
-constexpr size_t LED_COUNT = 1;
+#if defined(LED_DEBUG_PAGE) || defined(LED_REGION_DEBUG_PAGE)
+constexpr size_t LED_COUNT = 26;
 #else
 constexpr size_t LED_COUNT = Regions::INDEX_COUNT;
 #endif
@@ -43,7 +45,9 @@ const char *TIMEZONE_INFO = "EET-2EEST,M3.5.0/3,M10.5.0/4";
 Button *button1;
 Button *button2;
 Display *display;
-#if defined(LED_DEBUG_PAGE)
+#if defined(LED_REGION_DEBUG_PAGE)
+RegionDebugPage *regionDebugPage;
+#elif defined(LED_DEBUG_PAGE)
 LEDDebugPage *debugPage;
 #else
 EasyESPConnect *wifiManager;
@@ -55,7 +59,7 @@ AlertComponent *alertComponent;
 
 Page *currentPage;
 
-#if !defined(LED_DEBUG_PAGE)
+#if !defined(LED_DEBUG_PAGE) && !defined(LED_REGION_DEBUG_PAGE)
 void switchToPage(AppState state)
 {
   currentPage = (state == AppState::CLOCK) ? static_cast<Page *>(mainPage)
@@ -72,7 +76,7 @@ void setup()
 
    delay(1000);
 
-#if !defined(LED_DEBUG_PAGE)
+#if !defined(LED_DEBUG_PAGE) && !defined(LED_REGION_DEBUG_PAGE)
   esp_bt_controller_disable();
   WiFi.mode(WIFI_STA);
   WiFi.setTxPower(WIFI_POWER_11dBm);
@@ -94,7 +98,10 @@ void setup()
   button1 = new Button(BUTTON1_PIN);
   button2 = new Button(BUTTON2_PIN);
 
-#if defined(LED_DEBUG_PAGE)
+#if defined(LED_REGION_DEBUG_PAGE)
+  regionDebugPage = new RegionDebugPage(*display, leds);
+  currentPage = regionDebugPage;
+#elif defined(LED_DEBUG_PAGE)
   debugPage = new LEDDebugPage(*display, leds);
   currentPage = debugPage;
 #else
@@ -118,7 +125,7 @@ void setup()
   button2->onLongPress([]()
                        { currentPage->buttonClick(UiAction::CANCEL); });
 
-#if defined(LED_DEBUG_PAGE)
+#if defined(LED_DEBUG_PAGE) || defined(LED_REGION_DEBUG_PAGE)
   currentPage->setup();
 #else
   noWifiPage->stateChangeCallback(switchToPage);
@@ -136,7 +143,7 @@ void loop()
 {
   button1->loop();
   button2->loop();
-#if !defined(LED_DEBUG_PAGE)
+#if !defined(LED_DEBUG_PAGE) && !defined(LED_REGION_DEBUG_PAGE)
   wifiManager->loop();
 #endif
 

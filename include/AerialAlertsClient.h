@@ -5,6 +5,8 @@
 #include <freertos/semphr.h>
 #include <map>
 
+enum class AlertLevel : uint8_t { NONE, YELLOW, RED };
+
 class AerialAlertsClient {
  public:
   AerialAlertsClient(const char *url, unsigned long pollIntervalMs);
@@ -15,8 +17,9 @@ class AerialAlertsClient {
   // Fires a request immediately, regardless of the poll interval.
   void poll();
 
-  // Copies the per-region alert state from the last successful poll.
-  void copyRegionsTo(std::map<String, bool> &destination) const;
+  // Copies the per-region alert level from the last successful poll.
+  void copyRegionsTo(std::map<String, AlertLevel> &destination) const;
+  bool hasReceivedResponse() const;
 
   // True if any region in the last successful poll has alertnow=true.
   bool anyAlertActive() const;
@@ -24,7 +27,8 @@ class AerialAlertsClient {
  private:
   const char *url_;
   unsigned long pollIntervalMs_;
-  std::map<String, bool> regions_;
+  std::map<String, AlertLevel> regions_;
+  bool hasReceivedResponse_;
   SemaphoreHandle_t regionsMutex_;
   TaskHandle_t pollingTask_;
 

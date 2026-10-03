@@ -20,6 +20,10 @@
 #include <esp_bt.h>
 #endif
 
+#ifndef ALERTS_API_TOKEN
+#define ALERTS_API_TOKEN ""
+#endif
+
 #define BUTTON1_PIN 5
 #define BUTTON2_PIN 6
 #define OLED_SDA_PIN 8
@@ -71,6 +75,7 @@ void switchToPage(AppState state)
 void setup()
 {
   Serial.begin(115200);
+  leds.setBrightness(128);
 
   pinMode(0, OUTPUT);
 
@@ -107,8 +112,10 @@ void setup()
 #else
   wifiManager = new EasyESPConnect();
   clockComponent = new ClockComponent(*display, TIMEZONE_INFO);
-  alertComponent = new AlertComponent("https://ubilling.net.ua/aerialalerts/", 15000,
-                                      leds);
+  alertComponent = new AlertComponent(
+      "https://api.alerts.in.ua/v1/alerts/"
+      "active.json?token=" ALERTS_API_TOKEN,
+      15000, leds);
   noWifiPage = new NoWifiPage(*display, *wifiManager);
   mainPage = new MainPage(*display, *wifiManager, *clockComponent, *alertComponent);
 #endif

@@ -16,7 +16,7 @@ class AlertComponent : public Component {
 
  private:
   AerialAlertsClient alertsClient_;
-  std::map<String, bool> regions_;
+  std::map<String, AlertLevel> regions_;
   Adafruit_NeoPixel &leds_;
 
   void updateRegionLeds();

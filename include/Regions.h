@@ -2,9 +2,7 @@
 
 #include <cstring>
 
-// Region name strings as returned by the "states" object of
-// https://ubilling.net.ua/aerialalerts/ — use these constants instead of
-// retyping the Ukrainian names when matching against RegionAlert::name.
+// Ukrainian API names used as canonical keys for region alert state.
 namespace Regions {
 constexpr const char *VINNYTSIA = "Вінницька область";
 constexpr const char *VOLYN = "Волинська область";
@@ -31,49 +29,68 @@ constexpr const char *CHERKASY = "Черкаська область";
 constexpr const char *CHERNIVTSI = "Чернівецька область";
 constexpr const char *CHERNIHIV = "Чернігівська область";
 constexpr const char *KYIV_CITY = "м. Київ";
-constexpr const char *SEVASTOPOL = "м. Севастополь";
+constexpr const char *SEVASTOPOL = "Автономна Республіка Крим";
 
 struct RegionIndex {
 	const char *name;
+	const char *nameEn;
 	int index;
+	bool topHalf;
 };
 
 // Keep these indexes aligned with the display layout. Update this table when
 // the physical region order changes.
 constexpr RegionIndex INDEXES[] = {
-	{SEVASTOPOL, 0},
-	{KHERSON, 1},
-	{ZAPORIZHZHIA, 2},
-	{DONETSK, 3},
-	{LUHANSK, 4},
-	{KHARKIV, 5},
-	{DNIPROPETROVSK, 6},
-	{POLTAVA, 7},
-	{SUMY, 8},
-	{CHERNIHIV, 9},
-	{KYIV_CITY, 10},
-	{KYIV_OBLAST, 11},
-	{CHERKASY, 12},
-	{KIROVOHRAD, 13},
-	{MYKOLAIV, 14},
-	{ODESA, 15},
-	{VINNYTSIA, 16},
-	{KHMELNYTSKYI, 17},
-	{ZHYTOMYR, 18},
-	{RIVNE, 19},
-	{VOLYN, 20},
-	{LVIV, 21},
-	{ZAKARPATTIA, 22},
-	{IVANO_FRANKIVSK, 23},
-	{TERNOPIL, 24},
-	{CHERNIVTSI, 25},
+	{SEVASTOPOL, "Autonomous Republic of Crimea", 0, false},
+	{KHERSON, "Kherson Oblast", 1, false},
+	{ZAPORIZHZHIA, "Zaporizhzhia Oblast", 2, false},
+	{DONETSK, "Donetsk Oblast", 3, false},
+	{LUHANSK, "Luhansk Oblast", 4, true},
+	{KHARKIV, "Kharkiv Oblast", 5, true},
+	{DNIPROPETROVSK, "Dnipropetrovsk Oblast", 6, false},
+	{POLTAVA, "Poltava Oblast", 7, true},
+	{SUMY, "Sumy Oblast", 8, true},
+	{CHERNIHIV, "Chernihiv Oblast", 9, true},
+	{KYIV_CITY, "Kyiv City", 10, true},
+	{KYIV_OBLAST, "Kyiv Oblast", 11, true},
+	{CHERKASY, "Cherkasy Oblast", 12, false},
+	{KIROVOHRAD, "Kirovohrad Oblast", 13, false},
+	{MYKOLAIV, "Mykolaiv Oblast", 14, false},
+	{ODESA, "Odesa Oblast", 15, false},
+	{VINNYTSIA, "Vinnytsia Oblast", 16, true},
+	{KHMELNYTSKYI, "Khmelnytskyi Oblast", 17, true},
+	{ZHYTOMYR, "Zhytomyr Oblast", 18, true},
+	{RIVNE, "Rivne Oblast", 19, true},
+	{VOLYN, "Volyn Oblast", 20, true},
+	{LVIV, "Lviv Oblast", 21, true},
+	{ZAKARPATTIA, "Zakarpattia Oblast", 22, false},
+	{IVANO_FRANKIVSK, "Ivano-Frankivsk Oblast", 23, false},
+	{TERNOPIL, "Ternopil Oblast", 24, true},
+	{CHERNIVTSI, "Chernivtsi Oblast", 25, false},
 };
 
 constexpr size_t INDEX_COUNT = sizeof(INDEXES) / sizeof(INDEXES[0]);
 
-inline int indexForName(const char *name) {
+inline const char *canonicalNameForName(const char *name) {
+	if (name == nullptr) {
+		return nullptr;
+	}
 	for (size_t i = 0; i < INDEX_COUNT; ++i) {
-		if (std::strcmp(INDEXES[i].name, name) == 0) {
+		if (std::strcmp(INDEXES[i].name, name) == 0 ||
+			std::strcmp(INDEXES[i].nameEn, name) == 0) {
+			return INDEXES[i].name;
+		}
+	}
+	return nullptr;
+}
+
+inline int indexForName(const char *name) {
+	const char *canonicalName = canonicalNameForName(name);
+	if (canonicalName == nullptr) {
+		return -1;
+	}
+	for (size_t i = 0; i < INDEX_COUNT; ++i) {
+		if (INDEXES[i].name == canonicalName) {
 			return INDEXES[i].index;
 		}
 	}

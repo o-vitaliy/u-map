@@ -39,7 +39,7 @@ void RegionDebugPage::showSelectedRegion() {
 
     uint32_t color = regionIndex == selectedRegion_
                          ? leds_.Color(255, 0, 0)
-                         : leds_.Color(255, 255, 255);
+                         : leds_.Color(128, 128, 128);
     leds_.setPixelColor(region.index, color);
   }
 

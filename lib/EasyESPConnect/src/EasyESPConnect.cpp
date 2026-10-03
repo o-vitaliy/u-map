@@ -82,7 +82,7 @@ void EasyESPConnect::_setupAP(const char *apName)
     _apMode = true;
     WiFi.mode(WIFI_AP);
     log(String(F("_setupAP 2")) + _ssid);
-    bool result = WiFi.softAP(apName, "01234567");
+    bool result = WiFi.softAP(apName);
     log(String(F("AP Started: ")) + result);
     _setupCaptivePortal();
     log(String(F("AP Started: ")) + apName);
